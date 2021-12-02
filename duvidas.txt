@@ -1,0 +1,6 @@
+Tempo gasto por tarefa conta a espera no mutex para obter a tarefa a ser executada ou apenas o tempo de cálculo?
+
+Precisa ter uma thread separada para calcular estatisticas ou pode calcular elas na main?
+
+O contador do numero de vezes que a fila ficou vazia é o número de vezes que a thread leitora foi acordada? Fiquei confuso porque no enunciado diz que é para acordar
+ela quando tiverem n tarefas na fila, sendo n o numero de threads trabalhadoras.
