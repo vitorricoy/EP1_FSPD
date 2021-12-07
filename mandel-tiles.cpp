@@ -36,9 +36,8 @@ void* threadTrabalhadora(void* param) {
 	bool leuEOW = false;
 	while(!leuEOW) {
 		bool filaFicouVazia = false;
-		clock_t inicio = clock();
 		pthread_mutex_lock(&acessoListaTarefas);
-		if(tarefas.empty()) {
+		while(tarefas.empty()) {
 			filaFicouVazia = true;
 			pthread_cond_wait(&esperarTarefas, &acessoListaTarefas);
 		}
@@ -48,6 +47,7 @@ void* threadTrabalhadora(void* param) {
 			pthread_cond_signal(&preencherTarefas);
 		}
 		pthread_mutex_unlock(&acessoListaTarefas);
+		clock_t inicio = clock();
 		if(p.jres == 0 && p.ires == 0) {
 			leuEOW = true;
 		}
@@ -125,7 +125,7 @@ void* threadLeitora(void* param) {
 		
 		tarefas.push(p);
 		if(tarefas.size() >= 4*numeroThreads) {
-			pthread_cond_signal(&esperarTarefas);
+			pthread_cond_broadcast(&esperarTarefas);
 			pthread_cond_wait(&preencherTarefas, &acessoListaTarefas);
 		}
 		n = fscanf(entrada,"%d %d %d %d",&(p.left),&(p.low),&(p.ires),&(p.jres));
@@ -137,7 +137,7 @@ void* threadLeitora(void* param) {
 		tarefas.push(p);
 	}
 	pthread_mutex_unlock(&acessoListaTarefas);
-	pthread_exit( NULL );
+	pthread_exit(NULL);
 }
 
 int main(int argc, char* argv[]) {
@@ -194,4 +194,3 @@ int main(int argc, char* argv[]) {
 	printf("Fila estava vazia: %d vezes\n", contadorFilaVazia);
 	return 0;
 }
-
