@@ -10,7 +10,7 @@
 // Numero maximo de iteracoes maximo usado no calculo da funcao
 #define MAXITER 32768
 // Numero de threads trabalhadoras
-#define NUMERO_THREADS_TRABALHADORAS 5
+#define NUMERO_THREADS_TRABALHADORAS 1
 
 // Parametros para cada chamada a funcao de fractal
 // Esses parametros indicam uma tarefa de calculo da funcao
@@ -32,6 +32,43 @@ int tarefasExecutadasThread[NUMERO_THREADS_TRABALHADORAS]; // Indica o numero de
 double tempoTotalGasto = 0.0; // Indica o tempo total gasto executando as tarefas em milissegundos
 std::vector<double> tempoGastoTarefas; // Indica o tempo gasto executando cada tarefa em milissegundos
 int contadorFilaVazia = 0; // Indica o numero de vezes que uma thread trabalhadora encontrou a fila de tarefas vazia
+
+// Realiza os cálculos indicados pela tarefa recebida por parâmetro
+void realizarCalculo(fractal_param_t* p) {
+	// Declara as variaveis necessarias para os calculos da tarefa
+	double dx, dy;
+	double x, y, u, v, u2, v2;
+	
+	// Calcula o valor de dx e dy
+	dx = ( p->xmax - p->xmin ) / p->ires;
+	dy = ( p->ymax - p->ymin ) / p->jres;
+	
+	// Escaneia cada ponto na area retangular da tarefa
+	// Cada ponto representa um numero complexo (x + yi)
+	// Itera por esse numero complexo
+	for(int j = 0; j < p->jres; j++) {
+		for(int i = 0; i <= p->ires; i++) {
+			x = i * dx + p->xmin; // c_real
+			u = u2 = 0; // z_real
+			y = j * dy + p->ymin; // c_imaginario
+			v = v2 = 0; // z_imaginario
+
+			// Calcula se c(c_real + c_imaginario) pertence ao conjunto de Mandelbrot e desenha um pixel na coordenada (i, j) de acordo
+			// Se foi alcançado o numero maximo de iteracoes e se a distancia da origem e maior do que dois, encerra o loop
+			for(int k=0; (k < MAXITER) && ((u2+v2) < 4); ++k) {
+				// Calcula a funcao de Mandelbrot
+				// z = z*z + c em que z e um numero complexo
+
+				// imag = 2*z_real*z_imaginary + c_imaginary
+				v = 2 * u * v + y;
+				// real = z_real^2 - z_imaginary^2 + c_real
+				u  = u2 - v2 + x;
+				u2 = u * u;
+				v2 = v * v;
+			}
+		}
+	}
+}
 
 // Thread responsavel por consumir tarefas da fila de tarefas e executa-las, gerando dados para as estatisticas de execucao
 void* threadTrabalhadora(void* param) {
@@ -72,40 +109,8 @@ void* threadTrabalhadora(void* param) {
 		if(!leuEOW) {
 			// Inicia a contagem do tempo gasto para executar da tarefa
 			clock_t inicio = clock();
-			
-			// Declara as variaveis necessarias para os calculos da tarefa
-			double dx, dy;
-			double x, y, u, v, u2, v2;
-			
-			// Calcula o valor de dx e dy
-			dx = ( p.xmax - p.xmin ) / p.ires;
-			dy = ( p.ymax - p.ymin ) / p.jres;
-			
-			// Escaneia cada ponto na area retangular da tarefa
-			// Cada ponto representa um numero complexo (x + yi)
-			// Itera por esse numero complexo
-			for(int j = 0; j < p.jres; j++) {
-				for(int i = 0; i <= p.ires; i++) {
-					x = i * dx + p.xmin; // c_real
-					u = u2 = 0; // z_real
-					y = j * dy + p.ymin; // c_imaginario
-					v = v2 = 0; // z_imaginario
-
-					// Calcula se c(c_real + c_imaginario) pertence ao conjunto de Mandelbrot e desenha um pixel na coordenada (i, j) de acordo
-					// Se foi alcançado o numero maximo de iteracoes e se a distancia da origem e maior do que dois, encerra o loop
-					for(int k=0; (k < MAXITER) && ((u2+v2) < 4); ++k) {
-						// Calcula a funcao de Mandelbrot
-						// z = z*z + c em que z e um numero complexo
-
-						// imag = 2*z_real*z_imaginary + c_imaginary
-						v = 2 * u * v + y;
-						// real = z_real^2 - z_imaginary^2 + c_real
-						u  = u2 - v2 + x;
-						u2 = u * u;
-						v2 = v * v;
-					}
-				}
-			}
+			// Realiza os cálculos da tarefa
+			realizarCalculo(&p);
 			// Finaliza a contagem do tempo gasto para executar a tarefa
 			clock_t fim = clock();
 			// Calcula o valor do tempo gasto em milissegundos
@@ -218,6 +223,8 @@ int main(int argc, char* argv[]) {
 		pthread_create(&threadsTrabalhadoras[i], NULL, threadTrabalhadora, (void*) i);
 	}
 
+	clock_t inicio = clock();
+
 	// Espera a finalizacao da thread de leitura
 	pthread_join(threadLeitura, NULL);
 
@@ -225,6 +232,11 @@ int main(int argc, char* argv[]) {
 	for(int i=0; i<NUMERO_THREADS_TRABALHADORAS; i++) {
 		pthread_join(threadsTrabalhadoras[i], NULL);
 	}
+
+	clock_t fim = clock();
+
+	double tempoGasto = ((double)fim - inicio) / CLOCKS_PER_SEC;
+	printf("Tempo total gasto = %.6f\n", tempoGasto);
 
 	// Calcula as estasticas da execucao das tarefas
 	// Calcula a media do numero de tarefas executadas por cada thread
@@ -253,5 +265,13 @@ int main(int argc, char* argv[]) {
 	printf("Tarefas: total = %d;  média por trabalhador = %lf(%lf)\n", totalTarefasExecutadas, mediaTarefas, desvioPadraoTarefas);
 	printf("Tempo médio por tarefa: %.6f (%.6f) ms\n", mediaTempo, desvioPadraoTempoGasto);
 	printf("Fila estava vazia: %d vezes\n", contadorFilaVazia);
+
+	// Destroi os dois mutex usados para sincronizacao
+	pthread_mutex_destroy(&acessoVariaveisEstatistica);
+	pthread_mutex_destroy(&acessoFilaTarefas);
+	// Destroi as duas variaveis de condicao usadas para sincronizacao
+	pthread_cond_destroy(&preencherTarefas);
+	pthread_cond_destroy(&esperarTarefas);
+
 	return 0;
 }
