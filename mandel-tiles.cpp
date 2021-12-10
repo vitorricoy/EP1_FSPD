@@ -9,6 +9,8 @@
 
 // Numero maximo de iteracoes maximo usado no calculo da funcao
 #define MAXITER 32768
+// Numero de threads trabalhadoras
+#define NUMERO_THREADS_TRABALHADORAS 5
 
 // Parametros para cada chamada a funcao de fractal
 // Esses parametros indicam uma tarefa de calculo da funcao
@@ -21,13 +23,12 @@ typedef struct {
 
 FILE* entrada; // Arquivo que contem a lista de blocos a serem calculados
 std::queue<fractal_param_t> tarefas; // Fila de tarefas a serem consumidas pelas threads trabalhadoras
-const int numeroThreadsTrabalhadoras = 5; // Numero de threads trabalhadoras
 pthread_mutex_t acessoVariaveisEstatistica; // Mutex para controlar o acesso as variaveis usadas pelos calculos das estatisticas
 pthread_mutex_t acessoFilaTarefas; // Mutex para controlar o acesso a fila de tarefas
 pthread_cond_t preencherTarefas; // Variavel de condicao que controla se novas tarefas devem ser colocadas na fila
 pthread_cond_t esperarTarefas; // Variavel de condicao que controla se novas tarefas foram colocadas na fila
 int totalTarefasExecutadas = 0; // Indica o numero de tarefas executadas pelas threads trabalhadoras
-int tarefasExecutadasThread[numeroThreadsTrabalhadoras]; // Indica o numero de tarefas executadas por cada thread trabalhadora
+int tarefasExecutadasThread[NUMERO_THREADS_TRABALHADORAS]; // Indica o numero de tarefas executadas por cada thread trabalhadora
 double tempoTotalGasto = 0.0; // Indica o tempo total gasto executando as tarefas em milissegundos
 std::vector<double> tempoGastoTarefas; // Indica o tempo gasto executando cada tarefa em milissegundos
 int contadorFilaVazia = 0; // Indica o numero de vezes que uma thread trabalhadora encontrou a fila de tarefas vazia
@@ -56,7 +57,7 @@ void* threadTrabalhadora(void* param) {
 		// Remove essa tarefa da fila
 		tarefas.pop();
 		// Caso a fila de tarefas possua o mesmo numero de tarefas que de threads trabalhadoras
-		if(tarefas.size() == numeroThreadsTrabalhadoras) {
+		if(tarefas.size() == NUMERO_THREADS_TRABALHADORAS) {
 			// Indica para a thread leitora que ela deve preencher a fila de tarefas
 			pthread_cond_signal(&preencherTarefas);
 		}
@@ -160,7 +161,7 @@ void* threadLeitora(void* param) {
 		// Adiciona a tarefa lida na fila de tarefas
 		tarefas.push(p);
 		// Verifica se a fila já possui 4 vezes a quantidade de threads de tarefas
-		if(tarefas.size() >= 4*numeroThreadsTrabalhadoras) {
+		if(tarefas.size() >= 4*NUMERO_THREADS_TRABALHADORAS) {
 			// Caso a fila ja esteja cheia, indica que a fila foi preenchida caso alguma thread esteja esperando por tarefas
 			pthread_cond_broadcast(&esperarTarefas);
 			// Apos isso, espera algum thread trabalhadora indicar que a fila de tarefas deve ser preenchida novamente
@@ -175,7 +176,7 @@ void* threadLeitora(void* param) {
 	p.ires = 0;
 	p.jres = 0;
 	// Coloca na fila uma tarefa de end of work para cada thread trabalhadora
-	for(int i=0; i < numeroThreadsTrabalhadoras; i++) {
+	for(int i=0; i < NUMERO_THREADS_TRABALHADORAS; i++) {
 		tarefas.push(p);
 	}
 	// Libera o mutex de acesso a fila de tarefas
@@ -212,8 +213,8 @@ int main(int argc, char* argv[]) {
 	pthread_create(&threadLeitura, NULL, threadLeitora, NULL);
 
 	// Cria as threads responsaveis por consumir as tarefas da fila e executa-las
-	pthread_t threadsTrabalhadoras[numeroThreadsTrabalhadoras];
-	for(long i=0; i<numeroThreadsTrabalhadoras; i++) {
+	pthread_t threadsTrabalhadoras[NUMERO_THREADS_TRABALHADORAS];
+	for(long i=0; i<NUMERO_THREADS_TRABALHADORAS; i++) {
 		pthread_create(&threadsTrabalhadoras[i], NULL, threadTrabalhadora, (void*) i);
 	}
 
@@ -221,20 +222,20 @@ int main(int argc, char* argv[]) {
 	pthread_join(threadLeitura, NULL);
 
 	// Espera a finalizacao de todas as threads trabalhadoras
-	for(int i=0; i<numeroThreadsTrabalhadoras; i++) {
+	for(int i=0; i<NUMERO_THREADS_TRABALHADORAS; i++) {
 		pthread_join(threadsTrabalhadoras[i], NULL);
 	}
 
 	// Calcula as estasticas da execucao das tarefas
 	// Calcula a media do numero de tarefas executadas por cada thread
-	double mediaTarefas = (double) totalTarefasExecutadas/(double) numeroThreadsTrabalhadoras;
+	double mediaTarefas = (double) totalTarefasExecutadas/(double) NUMERO_THREADS_TRABALHADORAS;
 
 	// Calcula o desvio padrao do numero de tarefas executadas por cada thread
 	double desvioPadraoTarefas = 0;
-	for(int i=0; i<numeroThreadsTrabalhadoras; i++) {
+	for(int i=0; i<NUMERO_THREADS_TRABALHADORAS; i++) {
 		desvioPadraoTarefas += (tarefasExecutadasThread[i] - mediaTarefas)*(tarefasExecutadasThread[i] - mediaTarefas);
 	}
-	desvioPadraoTarefas /= (double) numeroThreadsTrabalhadoras;
+	desvioPadraoTarefas /= (double) NUMERO_THREADS_TRABALHADORAS;
 	desvioPadraoTarefas = sqrt(desvioPadraoTarefas);
 
 	// Calcula a media de tempo gasto para executar cada tarefa
