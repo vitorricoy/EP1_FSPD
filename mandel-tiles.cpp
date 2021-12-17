@@ -10,7 +10,7 @@
 // Numero maximo de iteracoes maximo usado no calculo da funcao
 #define MAXITER 32768
 // Numero de threads trabalhadoras
-#define NUMERO_THREADS_TRABALHADORAS 1
+int NUMERO_THREADS_TRABALHADORAS;
 
 // Parametros para cada chamada a funcao de fractal
 // Esses parametros indicam uma tarefa de calculo da funcao
@@ -28,7 +28,7 @@ pthread_mutex_t acessoFilaTarefas; // Mutex para controlar o acesso a fila de ta
 pthread_cond_t preencherTarefas; // Variavel de condicao que controla se novas tarefas devem ser colocadas na fila
 pthread_cond_t esperarTarefas; // Variavel de condicao que controla se novas tarefas foram colocadas na fila
 int totalTarefasExecutadas = 0; // Indica o numero de tarefas executadas pelas threads trabalhadoras
-int tarefasExecutadasThread[NUMERO_THREADS_TRABALHADORAS]; // Indica o numero de tarefas executadas por cada thread trabalhadora
+std::vector<int> tarefasExecutadasThread; // Indica o numero de tarefas executadas por cada thread trabalhadora
 double tempoTotalGasto = 0.0; // Indica o tempo total gasto executando as tarefas em milissegundos
 std::vector<double> tempoGastoTarefas; // Indica o tempo gasto executando cada tarefa em milissegundos
 int contadorFilaVazia = 0; // Indica o numero de vezes que uma thread trabalhadora encontrou a fila de tarefas vazia
@@ -180,6 +180,13 @@ void* threadLeitora(void* param) {
 	// Salva na variavel dos parametros a indicacao de que essa tarefa indica um end of work para as threads trabalhadoras
 	p.ires = 0;
 	p.jres = 0;
+	// Verifica se as tarefas de EOW cabem na fila, caso nao caibam espera ter espaço para coloca-las
+	if(tarefas.size() - NUMERO_THREADS_TRABALHADORAS > 4*NUMERO_THREADS_TRABALHADORAS) {
+		// Caso a fila ja esteja cheia, indica que a fila foi preenchida caso alguma thread esteja esperando por tarefas
+		pthread_cond_broadcast(&esperarTarefas);
+		// Apos isso, espera algum thread trabalhadora indicar que a fila de tarefas deve ser preenchida novamente
+		pthread_cond_wait(&preencherTarefas, &acessoFilaTarefas);
+	}
 	// Coloca na fila uma tarefa de end of work para cada thread trabalhadora
 	for(int i=0; i < NUMERO_THREADS_TRABALHADORAS; i++) {
 		tarefas.push(p);
@@ -193,9 +200,9 @@ void* threadLeitora(void* param) {
 int main(int argc, char* argv[]) {
 
 	// Verifica se o programa recebeu o arquivo de entrada como argumento
-	if(argc!=2) {
+	if(argc!=3) {
 		// Imprime o uso correto do programa e encerra sua execucao
-		fprintf(stderr,"usage %s filename\n", argv[0] );
+		fprintf(stderr,"uso %s nome_arquivo numero_threads_trabalhadoras\n", argv[0]);
 		exit(-1);
 	}
 	
@@ -205,6 +212,19 @@ int main(int argc, char* argv[]) {
 		perror("fopen");
 		exit(-1);
 	}
+
+	// Converte o numero de threads trabalhadoras recebidas por argumento para um inteiro
+	NUMERO_THREADS_TRABALHADORAS = atoi(argv[2]);
+
+	// Verifica se o numero de threads recebido e invalido
+	if(NUMERO_THREADS_TRABALHADORAS <= 0) {
+		// Imprime o uso correto do programa e encerra sua execucao
+		fprintf(stderr,"uso %s nome_arquivo numero_threads_trabalhadoras\n", argv[0]);
+		exit(-1);
+	}
+	
+	// Inicializa o vector de tarefas executadas por cada thread
+	tarefasExecutadasThread = std::vector<int>(NUMERO_THREADS_TRABALHADORAS, 0);
 
 	// Inicializa os dois mutex usados para sincronizacao
 	pthread_mutex_init(&acessoVariaveisEstatistica, NULL);
