@@ -180,7 +180,7 @@ void* threadLeitora(void* param) {
 	// Salva na variavel dos parametros a indicacao de que essa tarefa indica um end of work para as threads trabalhadoras
 	p.ires = 0;
 	p.jres = 0;
-	// Verifica se as tarefas de EOW cabem na fila, caso nao caibam espera ter espaço para coloca-las
+	// Verifica se as tarefas de EOW cabem todas ao mesmo tempo na fila, caso nao caibam espera ter espaço para coloca-las
 	if(tarefas.size() - NUMERO_THREADS_TRABALHADORAS > 4*NUMERO_THREADS_TRABALHADORAS) {
 		// Caso a fila ja esteja cheia, indica que a fila foi preenchida caso alguma thread esteja esperando por tarefas
 		pthread_cond_broadcast(&esperarTarefas);
@@ -193,6 +193,8 @@ void* threadLeitora(void* param) {
 	}
 	// Libera o mutex de acesso a fila de tarefas
 	pthread_mutex_unlock(&acessoFilaTarefas);
+	// Sinaliza caso exista alguma thread trabalhadora esperando tarefas
+	pthread_cond_broadcast(&esperarTarefas);
 	// Encerra a execucao da thread leitora
 	pthread_exit(NULL);
 }
