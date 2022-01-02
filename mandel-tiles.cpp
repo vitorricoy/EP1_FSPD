@@ -202,9 +202,9 @@ void* threadLeitora(void* param) {
 int main(int argc, char* argv[]) {
 
 	// Verifica se o programa recebeu o arquivo de entrada como argumento
-	if(argc!=3) {
+	if(argc <= 1 || argc > 3) {
 		// Imprime o uso correto do programa e encerra sua execucao
-		fprintf(stderr,"uso %s nome_arquivo numero_threads_trabalhadoras\n", argv[0]);
+		fprintf(stderr,"uso %s nome_arquivo <numero_threads_trabalhadoras>\n", argv[0]);
 		exit(-1);
 	}
 	
@@ -216,7 +216,13 @@ int main(int argc, char* argv[]) {
 	}
 
 	// Converte o numero de threads trabalhadoras recebidas por argumento para um inteiro
-	NUMERO_THREADS_TRABALHADORAS = atoi(argv[2]);
+	if(argc == 3) {
+		NUMERO_THREADS_TRABALHADORAS = atoi(argv[2]);
+	} else {
+		// Caso nao tenha sido dado o numero de threads trabalhadoras ele e definido como 4
+		NUMERO_THREADS_TRABALHADORAS = 4;
+	}
+	
 
 	// Verifica se o numero de threads recebido e invalido
 	if(NUMERO_THREADS_TRABALHADORAS <= 0) {
